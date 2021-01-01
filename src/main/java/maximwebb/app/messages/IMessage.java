@@ -1,5 +1,7 @@
-package maximwebb.app;
+package maximwebb.app.messages;
 
-public interface IMessage {
+import java.io.Serializable;
+
+public interface IMessage extends Serializable {
 
 }
