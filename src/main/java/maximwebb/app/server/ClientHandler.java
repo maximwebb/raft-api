@@ -1,16 +1,11 @@
 package maximwebb.app.server;
 
-import maximwebb.app.client.Link;
 import maximwebb.app.messages.IMessage;
-import maximwebb.app.messages.TextMessage;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.util.LinkedList;
-import java.util.Queue;
 
 public class ClientHandler {
     private final Thread outgoingHandler;
@@ -18,6 +13,7 @@ public class ClientHandler {
     private final Socket socket;
     private MultiQueue multiQueue;
     private MessageQueue messageQueue;
+    private boolean shutdown = false;
 
     public ClientHandler(Socket s, MultiQueue mq) {
         socket = s;
@@ -38,7 +34,7 @@ public class ClientHandler {
     private void outgoing() {
         try {
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-            while (true) {
+            while (!shutdown) {
                 IMessage msg = messageQueue.take();
                 oos.writeObject(msg);
             }
@@ -51,7 +47,7 @@ public class ClientHandler {
     private void incoming() {
         try {
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-            while (true) {
+            while (!shutdown) {
                 try {
                     Object raw = ois.readObject();
                     if (raw instanceof IMessage) {
@@ -61,6 +57,16 @@ public class ClientHandler {
                     e.printStackTrace();
                 }
             }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void shutdown() {
+        shutdown = true;
+        multiQueue.deregister(messageQueue);
+        try {
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
