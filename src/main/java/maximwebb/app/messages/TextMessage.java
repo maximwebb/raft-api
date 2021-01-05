@@ -2,7 +2,6 @@ package maximwebb.app.messages;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Optional;
 import java.util.UUID;
 
 public class TextMessage implements IMessage {

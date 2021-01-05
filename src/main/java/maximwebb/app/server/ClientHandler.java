@@ -46,8 +46,8 @@ public class ClientHandler {
     /* Receives messages from clients and adds to message queue */
     private void incoming() {
         try {
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
             while (!shutdown) {
+                ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
                 try {
                     Object raw = ois.readObject();
                     if (raw instanceof IMessage) {
