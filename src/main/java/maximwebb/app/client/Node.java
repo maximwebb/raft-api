@@ -25,6 +25,7 @@ public class Node {
     /* Follower behaviour handling */
     private Socket nodeSocket;
     private Thread incomingMessageHandler;
+    private boolean willExit;
 
     /* Leader behaviour handling */
     private ServerSocket serverSocket;
@@ -39,6 +40,7 @@ public class Node {
     public Node(String name) {
         this.name = name;
         uid = UUID.randomUUID();
+        willExit = false;
     }
 
     public NodeInfo getNodeInfo() {
@@ -59,7 +61,7 @@ public class Node {
         System.out.println("Opening connection.");
         try {
             ObjectInputStream ois = new ObjectInputStream(nodeSocket.getInputStream());
-            while (true) {
+            while (!willExit) {
                 Object raw = ois.readObject();
                 if (raw instanceof IMessage) {
                     deliver((IMessage) raw);
@@ -67,20 +69,17 @@ public class Node {
                     System.out.println("Invalid message type.");
                 }
             }
+            System.out.println("Stopped thread.");
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
 
     public void disconnect() {
-        System.out.println("Connection terminated.");
-        try {
-            incomingMessageHandler.join();
-            nodeSocket.close();
-            serverSocket.close();
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
+        willExit = true;
+        incomingMessageHandler.interrupt();
+        //TODO: Create custom disconnect message
+        broadcast(name + " disconnected.");
     }
 
     public void createNetwork(int port) {
@@ -125,7 +124,7 @@ public class Node {
                 e.printStackTrace();
             }
             if (client != null) {
-                ClientHandler clientHandler = new ClientHandler(client, multiQueue);
+                ClientHandler clientHandler = new ClientHandler(client, multiQueue, uid);
                 clientHandlerList.add(clientHandler);
                 multiQueue.put(new TextMessage(client.toString() + " connected from " + client.getInetAddress() + ".", "Server", uid, null));
             }
@@ -170,7 +169,7 @@ public class Node {
         for (NodeInfo info : nodeInfoSet) {
             try {
                 Socket s = new Socket(info.address, info.port);
-                ClientHandler clientHandler = new ClientHandler(s, multiQueue);
+                ClientHandler clientHandler = new ClientHandler(s, multiQueue, uid);
                 clientHandlerList.add(clientHandler);
             } catch (IOException e) {
                 System.out.println("Error: could not connect to client at " + info.address + " on port " + info.port + ".");
@@ -192,6 +191,5 @@ public class Node {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
     }
 }

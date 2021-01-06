@@ -1,23 +1,27 @@
 package maximwebb.app.server;
 
 import maximwebb.app.messages.IMessage;
+import maximwebb.app.messages.TextMessage;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.UUID;
 
 public class ClientHandler {
     private final Thread outgoingHandler;
     private final Thread incomingHandler;
     private final Socket socket;
+    private final UUID serverId;
     private MultiQueue multiQueue;
     private MessageQueue messageQueue;
     private boolean shutdown = false;
 
-    public ClientHandler(Socket s, MultiQueue mq) {
+    public ClientHandler(Socket s, MultiQueue mq, UUID serverId) {
         socket = s;
         this.multiQueue = mq;
+        this.serverId = serverId;
         messageQueue = new MessageQueue();
         multiQueue.register(messageQueue);
 
@@ -39,7 +43,9 @@ public class ClientHandler {
                 oos.writeObject(msg);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("test");
+            multiQueue.deregister(messageQueue);
+            multiQueue.put(new TextMessage("User has disconnected.", "Server", serverId, null));
         }
     }
 
@@ -53,7 +59,11 @@ public class ClientHandler {
                     if (raw instanceof IMessage) {
                         multiQueue.put((IMessage) raw);
                     }
-                } catch (IOException | ClassNotFoundException e) {
+                } catch (IOException e) {
+                    System.out.println("test");
+                    multiQueue.deregister(messageQueue);
+                    multiQueue.put(new TextMessage("User has disconnected.", "Server", serverId, null));
+                } catch (ClassNotFoundException e) {
                     e.printStackTrace();
                 }
             }
