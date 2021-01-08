@@ -1,5 +1,6 @@
 package maximwebb.app.client;
 
+import maximwebb.app.messages.ChangeNameMessage;
 import maximwebb.app.messages.IMessage;
 import maximwebb.app.messages.NodeInfoMessage;
 import maximwebb.app.messages.NodeInfoRequestMessage;
@@ -67,7 +68,7 @@ public class Node {
         directMessageHandler = new Thread(this::receiveDirectMessage);
         directMessageHandler.setDaemon(true);
         directMessageHandler.start();
-        broadcast(new NodeInfoMessage(getNodeInfo(), uid));
+        broadcast(new NodeInfoMessage(getNodeInfo(), null));
         broadcast(new NodeInfoRequestMessage(uid));
     }
 
@@ -77,28 +78,6 @@ public class Node {
             incomingMessageHandler.interrupt();
             //TODO: Create custom disconnect message
             broadcast(name + " disconnected.");
-        }
-    }
-
-    private void incomingHandler() {
-        System.out.println("Opening connection.");
-        try {
-            ObjectInputStream ois = new ObjectInputStream(nodeSocket.getInputStream());
-            while (!willExit) {
-                Object raw = ois.readObject();
-                if (raw instanceof IMessage) {
-                    deliver((IMessage) raw);
-                } else {
-                    System.out.println("Invalid message type.");
-                }
-            }
-            System.out.println("Stopped thread.");
-        } catch (EOFException e) {
-            System.out.println("Server node terminated.");
-            willExit = true;
-            incomingMessageHandler.interrupt();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
         }
     }
 
@@ -139,6 +118,36 @@ public class Node {
         clientAccepterHandler.start();
     }
 
+    public InetAddress getAddress() {
+        return datagramSocket.getInetAddress();
+    }
+
+    public int getPort() {
+        return datagramSocket.getLocalPort();
+    }
+
+    private void incomingHandler() {
+        System.out.println("Opening connection.");
+        try {
+            ObjectInputStream ois = new ObjectInputStream(nodeSocket.getInputStream());
+            while (!willExit) {
+                Object raw = ois.readObject();
+                if (raw instanceof IMessage) {
+                    deliver((IMessage) raw);
+                } else {
+                    System.out.println("Invalid message type.");
+                }
+            }
+            System.out.println("Stopped thread.");
+        } catch (EOFException e) {
+            System.out.println("Server node terminated.");
+            willExit = true;
+            incomingMessageHandler.interrupt();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void clientAccepter() {
         while (true) {
             Socket client = null;
@@ -150,37 +159,34 @@ public class Node {
             if (client != null) {
                 ClientHandler clientHandler = new ClientHandler(this, client, multiQueue, uid);
                 clientHandlerList.add(clientHandler);
-                multiQueue.put(new TextMessage(client.toString() + " connected from " + client.getInetAddress() + ".", "Server", uid, null));
-                multiQueue.put(new NodeInfoMessage(getNodeInfo(), null));
+                broadcast(new NodeInfoMessage(getNodeInfo(), null));
             }
         }
     }
 
-    public InetAddress getAddress() {
-        return datagramSocket.getInetAddress();
-    }
-
-    public int getPort() {
-        return datagramSocket.getLocalPort();
-    }
-
-
     public void broadcast(IMessage message) {
-        if (role == NodeRole.LEADER) {
-            multiQueue.put(message);
-        } else {
-            try {
-                ObjectOutputStream oos = new ObjectOutputStream(nodeSocket.getOutputStream());
-                oos.writeObject(message);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            ObjectOutputStream oos = new ObjectOutputStream(nodeSocket.getOutputStream());
+            oos.writeObject(message);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     public void broadcast(String msg) {
         TextMessage textMessage = new TextMessage(msg, name, uid, null);
         broadcast(textMessage);
+    }
+
+    void deliver(IMessage message) {
+        if (message instanceof TextMessage) {
+            System.out.println(message.toString());
+        } else if (message instanceof NodeInfoMessage) {
+            NodeInfo info = ((NodeInfoMessage) message).nodeInfo;
+            setNodeInfo(info);
+        } else if (message instanceof NodeInfoRequestMessage) {
+            broadcast(new NodeInfoMessage(getNodeInfo(), null));
+        }
     }
 
     public void sendDirectMessage(IMessage message) {
@@ -193,9 +199,6 @@ public class Node {
                 oos.writeObject(message);
                 buffer = baos.toByteArray();
                 InetAddress inetAddress = InetAddress.getByName("127.0.0.1");
-                System.out.println("Sending DM to: ");
-                System.out.println(inetAddress);
-                System.out.println(node.port);
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length, inetAddress, node.port);
                 datagramSocket.send(packet);
             } catch (IOException e) {
@@ -205,7 +208,6 @@ public class Node {
             System.out.println("Error: Please specify recipient...");
         }
     }
-
 
     private void receiveDirectMessage() {
         while (true) {
@@ -227,19 +229,6 @@ public class Node {
             } catch (ClassNotFoundException e) {
                 System.err.println("Message corrupted. Requesting again...");
             }
-
-        }
-    }
-
-    void deliver(IMessage message) {
-        if (message instanceof TextMessage) {
-            System.out.println(message.toString());
-        } else if (message instanceof NodeInfoMessage) {
-            NodeInfo info = ((NodeInfoMessage) message).nodeInfo;
-            if (info.nodeId != uid) {
-                nodeInfoMap.put(info.nodeId, info);
-                System.out.println("Added " + info.name + " to " + name);
-            }
         }
     }
 
@@ -247,6 +236,23 @@ public class Node {
         return new NodeInfo(getAddress(), getPort(), networkId, uid, name, role);
     }
 
+    public void setNodeInfo(NodeInfo nodeInfo) {
+        if (nodeInfo.nodeId.equals(uid)) {
+            this.name = nodeInfo.name;
+            this.networkId = nodeInfo.networkId;
+            this.role = nodeInfo.nodeRole;
+        }
+        nodeInfoMap.put(nodeInfo.nodeId, nodeInfo);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+        nodeInfoMap.get(uid).setName(name);
+    }
 
     public Set<NodeInfo> getNodesByName(String name) {
         Set<NodeInfo> result = new HashSet<>();

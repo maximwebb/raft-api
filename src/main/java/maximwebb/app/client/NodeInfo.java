@@ -20,4 +20,8 @@ public class NodeInfo implements Serializable {
         this.name = name;
         this.nodeRole = nodeRole;
     }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 }

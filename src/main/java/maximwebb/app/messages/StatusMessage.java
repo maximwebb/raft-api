@@ -5,20 +5,10 @@ import java.util.UUID;
 /* Used for invoking an action on a node */
 public class StatusMessage implements IMessage {
 
-    private String message;
-    private UUID authorId;
-    private UUID recipientId;
+    private final UUID authorId;
 
-    public StatusMessage(String message, UUID authorId) {
-        this.message = message;
+    public StatusMessage(UUID authorId) {
         this.authorId = authorId;
-        this.recipientId = null;
-    }
-
-    public StatusMessage(String message, UUID authorId, UUID recipientId) {
-        this.message = message;
-        this.authorId = authorId;
-        this.recipientId = recipientId;
     }
 
     @Override
