@@ -1,6 +1,10 @@
 package maximwebb.app.server;
 
+import maximwebb.app.client.Node;
+import maximwebb.app.client.NodeInfo;
 import maximwebb.app.messages.IMessage;
+import maximwebb.app.messages.NodeInfoMessage;
+import maximwebb.app.messages.NodeInfoRequestMessage;
 import maximwebb.app.messages.TextMessage;
 
 import java.io.IOException;
@@ -12,14 +16,16 @@ import java.util.UUID;
 public class ClientHandler {
     private final Thread outgoingHandler;
     private final Thread incomingHandler;
+    private Node node;
     private final Socket socket;
     private final UUID serverId;
     private MultiQueue multiQueue;
     private MessageQueue messageQueue;
     private boolean shutdown = false;
 
-    public ClientHandler(Socket s, MultiQueue mq, UUID serverId) {
-        socket = s;
+    public ClientHandler(Node node, Socket socket, MultiQueue mq, UUID serverId) {
+        this.node = node;
+        this.socket = socket;
         this.multiQueue = mq;
         this.serverId = serverId;
         messageQueue = new MessageQueue();
@@ -43,7 +49,6 @@ public class ClientHandler {
                 oos.writeObject(msg);
             }
         } catch (IOException e) {
-            System.out.println("test");
             multiQueue.deregister(messageQueue);
             multiQueue.put(new TextMessage("User has disconnected.", "Server", serverId, null));
         }
@@ -57,10 +62,19 @@ public class ClientHandler {
                 try {
                     Object raw = ois.readObject();
                     if (raw instanceof IMessage) {
-                        multiQueue.put((IMessage) raw);
+                        UUID authorId = ((IMessage) raw).getAuthorId();
+                        if (raw instanceof TextMessage) {
+                            multiQueue.put((IMessage) raw);
+                        } else if (raw instanceof NodeInfoRequestMessage) {
+                            for (NodeInfo info : node.nodeInfoMap.values()) {
+                                messageQueue.put(new NodeInfoMessage(info, authorId));
+                            }
+                        } else if (raw instanceof NodeInfoMessage) {
+                            //TODO: specify recipient on multiqueue
+                            multiQueue.put(((NodeInfoMessage) raw));
+                        }
                     }
                 } catch (IOException e) {
-                    System.out.println("test");
                     multiQueue.deregister(messageQueue);
                     multiQueue.put(new TextMessage("User has disconnected.", "Server", serverId, null));
                 } catch (ClassNotFoundException e) {

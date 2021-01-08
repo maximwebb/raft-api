@@ -21,8 +21,11 @@ public class TextMessage implements IMessage {
 
     @Override
     public String toString() {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss z");
-        return sdf.format(timestamp) + " [" + author + "]: " + message;
+        if (recipientId == null) {
+            return getTimeStamp() + " [" + author + "]: " + message;
+        } else {
+            return getTimeStamp() + " [" + author + "] (Direct): " + message;
+        }
     }
 
     @Override
@@ -33,5 +36,10 @@ public class TextMessage implements IMessage {
     @Override
     public UUID getRecipientId() {
         return recipientId;
+    }
+
+    public String getTimeStamp() {
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss z");
+        return sdf.format(timestamp);
     }
 }

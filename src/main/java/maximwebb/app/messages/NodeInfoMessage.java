@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public class NodeInfoMessage implements IMessage {
 
-    public UUID authorId;
     public NodeInfo nodeInfo;
     public UUID recipientId;
 
@@ -17,7 +16,7 @@ public class NodeInfoMessage implements IMessage {
 
     @Override
     public UUID getAuthorId() {
-        return authorId;
+        return nodeInfo.nodeId;
     }
 
     @Override
