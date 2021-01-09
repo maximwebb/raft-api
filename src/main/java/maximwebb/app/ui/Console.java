@@ -122,6 +122,10 @@ public class Console implements Runnable {
                             System.out.println("Usage: /" + command + " nickname");
                         }
                         break;
+                    /* For debugging purposes only. */
+                    case "stopheartbeat":
+                        node.heartbeatHandler.interrupt();
+                        break;
                     default:
                         System.out.println("Invalid command");
                         break;

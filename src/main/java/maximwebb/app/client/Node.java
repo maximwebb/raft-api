@@ -1,9 +1,9 @@
 package maximwebb.app.client;
 
-import maximwebb.app.messages.ChangeNameMessage;
 import maximwebb.app.messages.IMessage;
 import maximwebb.app.messages.NodeInfoMessage;
 import maximwebb.app.messages.NodeInfoRequestMessage;
+import maximwebb.app.messages.StatusMessage;
 import maximwebb.app.messages.TextMessage;
 import maximwebb.app.server.ClientHandler;
 import maximwebb.app.server.MultiQueue;
@@ -38,11 +38,15 @@ public class Node {
     private DatagramSocket datagramSocket;
     private Thread incomingMessageHandler;
     private Thread directMessageHandler;
+    private Thread leaderTimeoutListener;
+    private long leaderTimeoutDuration;
     private boolean willExit;
+    private boolean leaderAlive;
 
     /* Leader behaviour handling */
     public ServerSocket serverSocket;
     private Thread clientAccepterHandler;
+    public Thread heartbeatHandler;
     private ArrayList<ClientHandler> clientHandlerList;
     private MultiQueue multiQueue;
 
@@ -54,11 +58,14 @@ public class Node {
         this.name = name;
         uid = UUID.randomUUID();
         willExit = false;
+        leaderTimeoutDuration = (long) ((Math.random() * 7 + 3) * 1000);
+        System.out.println("Timeout duration set to: " + leaderTimeoutDuration);
     }
 
     public void connect(InetAddress address, int port) throws IOException {
         this.role = NodeRole.FOLLOWER;
         willExit = false;
+        leaderAlive = true;
         nodeInfoMap = new HashMap<>();
         datagramSocket = new DatagramSocket(0);
         nodeSocket = new Socket(address, port);
@@ -70,6 +77,9 @@ public class Node {
         directMessageHandler.start();
         broadcast(new NodeInfoMessage(getNodeInfo(), null));
         broadcast(new NodeInfoRequestMessage(uid));
+        leaderTimeoutListener = new Thread(this::testLeaderTimeout);
+        leaderTimeoutListener.setDaemon(true);
+        leaderTimeoutListener.start();
     }
 
     public void disconnect() {
@@ -116,6 +126,9 @@ public class Node {
         clientAccepterHandler = new Thread(this::clientAccepter);
         clientAccepterHandler.setDaemon(true);
         clientAccepterHandler.start();
+        heartbeatHandler = new Thread(this::heartbeat);
+        heartbeatHandler.setDaemon(true);
+        heartbeatHandler.start();
     }
 
     public InetAddress getAddress() {
@@ -133,6 +146,7 @@ public class Node {
             while (!willExit) {
                 Object raw = ois.readObject();
                 if (raw instanceof IMessage) {
+                    leaderAlive = true;
                     deliver((IMessage) raw);
                 } else {
                     System.out.println("Invalid message type.");
@@ -186,6 +200,8 @@ public class Node {
             setNodeInfo(info);
         } else if (message instanceof NodeInfoRequestMessage) {
             broadcast(new NodeInfoMessage(getNodeInfo(), null));
+        } else if (message instanceof StatusMessage) {
+            System.out.println("Heartbeat received - resetting timer.");
         }
     }
 
@@ -227,6 +243,7 @@ public class Node {
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (ClassNotFoundException e) {
+                //TODO: implement this
                 System.err.println("Message corrupted. Requesting again...");
             }
         }
@@ -270,6 +287,29 @@ public class Node {
 
     public boolean hasNodeId(UUID nodeId) {
         return nodeInfoMap.containsKey(nodeId);
+    }
+
+    private void testLeaderTimeout() {
+        while (leaderAlive) {
+            leaderAlive = false;
+            try {
+                Thread.sleep(leaderTimeoutDuration);
+            } catch (InterruptedException e) {
+                System.out.println("Timeout thread interrupted.");
+            }
+        }
+        System.out.println("Leader timeout detected! Triggering leader election...");
+    }
+
+    private void heartbeat() {
+        try {
+            while (true) {
+                Thread.sleep(1000);
+                broadcast(new StatusMessage(uid));
+            }
+        } catch (InterruptedException e) {
+            System.out.println("Heartbeat thread interrupted.");
+        }
     }
 
     public void promote() {

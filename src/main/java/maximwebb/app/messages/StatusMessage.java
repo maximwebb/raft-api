@@ -2,7 +2,7 @@ package maximwebb.app.messages;
 
 import java.util.UUID;
 
-/* Used for invoking an action on a node */
+/* Used as a heartbeat message */
 public class StatusMessage implements IMessage {
 
     private final UUID authorId;

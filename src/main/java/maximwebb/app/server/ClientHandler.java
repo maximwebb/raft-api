@@ -6,6 +6,7 @@ import maximwebb.app.messages.ChangeNameMessage;
 import maximwebb.app.messages.IMessage;
 import maximwebb.app.messages.NodeInfoMessage;
 import maximwebb.app.messages.NodeInfoRequestMessage;
+import maximwebb.app.messages.StatusMessage;
 import maximwebb.app.messages.TextMessage;
 
 import java.io.EOFException;
@@ -92,6 +93,8 @@ public class ClientHandler {
                                 multiQueue.put(new NodeInfoMessage(newNodeInfo, null));
                                 multiQueue.put(new TextMessage(oldName + " has changed their name to " + newName, "Server", serverId, null));
                             }
+                        } else if (raw instanceof StatusMessage) {
+                            multiQueue.putAllExcept((StatusMessage)raw, serverId);
                         }
                     }
                 } catch (IOException e) {

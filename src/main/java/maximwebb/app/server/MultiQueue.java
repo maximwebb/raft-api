@@ -50,7 +50,7 @@ public class MultiQueue {
 
     public synchronized void putAllExcept(IMessage message, UUID uuid) {
         for (UUID recipientId : messageQueues.keySet()) {
-            if (recipientId != uuid) {
+            if (!recipientId.equals(uuid)) {
                 messageQueues.get(recipientId).put(message);
             }
         }
